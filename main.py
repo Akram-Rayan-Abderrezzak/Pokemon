@@ -8,7 +8,22 @@ with open("pokemon_data.json", "r") as file:
     pokemon_data = json.load(file)
 
 # Chemin du dossier des images
-image_path = "Image"
+image_path = "image"
+
+# Liste des starters et leurs évolutions
+starters = {
+    "chespin": "quilladin",
+    "fennekin": "braixen",
+    "froakie": "frogadier",
+    "rowlet": "dartrix"
+}
+
+final_evolutions = {
+    "quilladin": "chesnaught",
+    "braixen": "delphox",
+    "frogadier": "greninja",
+    "dartrix": "decidueye"
+}
 
 def charger_image(nom):
     chemin = os.path.join(image_path, f"{nom}.png")
@@ -16,15 +31,19 @@ def charger_image(nom):
         return pygame.image.load(chemin)
     return None
 
-# Sélectionner un Pokémon au hasard
-def choisir_pokemon():
-    nom, data = random.choice(list(pokemon_data.items()))
+# Sélectionner un Pokémon
+def choisir_pokemon(nom=None):
+    if not nom:
+        nom, data = random.choice(list(pokemon_data.items()))
+    else:
+        data = pokemon_data[nom]
     types = data["TYPE"]
     attaques = random.sample(data["ATTACK list"], min(len(types), 2))
     image = charger_image(nom)
     return {
         "nom": nom,
         "pv": data["PV"],
+        "pv_max": data["PV"],
         "vitesse": data["VITESSE"],
         "attaques": attaques,
         "image": image
@@ -44,29 +63,58 @@ pygame.display.set_caption("Combat Pokémon")
 
 defaut_font = pygame.font.Font(None, 36)
 
-# Choisir deux Pokémon
-pokemon1 = choisir_pokemon()
-pokemon2 = choisir_pokemon()
+# Chargement de l'image de fond
+background = pygame.image.load("ring.png")
+
+# Choisir le premier Pokémon du joueur
+equipe_joueur = [choisir_pokemon(random.choice(list(starters.keys())))]
+
+# Sélection du premier Pokémon adverse
+adversaire = choisir_pokemon()
+
+# Initialisation du niveau
+level = 1
 
 # Boucle principale
 running = True
-joueur_actuel = pokemon1
-adversaire = pokemon2
+joueur_actuel = equipe_joueur[0]
+
+def attaque_adversaire():
+    attaque = random.choice(adversaire["attaques"])
+    degats = random.randint(10 + level, 20 + level)
+    joueur_actuel["pv"] -= degats
+    print(f"{adversaire['nom']} utilise {attaque} et inflige {degats} dégâts!")
+    if joueur_actuel["pv"] <= 0:
+        print(f"{joueur_actuel['nom']} a été vaincu!")
+        return True
+    return False
 
 while running:
-    ecran.fill(blanc)
+    ecran.blit(background, (0, 0))
+    
+    # Gestion de l'évolution du Pokémon
+    if level == 6 and joueur_actuel["nom"] in starters:
+        joueur_actuel = choisir_pokemon(starters[joueur_actuel["nom"]])
+        equipe_joueur[0] = joueur_actuel
+        print(f"{joueur_actuel['nom']} a évolué !")
+    elif level == 16 and joueur_actuel["nom"] in final_evolutions:
+        joueur_actuel = choisir_pokemon(final_evolutions[joueur_actuel["nom"]])
+        equipe_joueur[0] = joueur_actuel
+        print(f"{joueur_actuel['nom']} a atteint sa forme finale !")
     
     # Affichage des Pokémon (images)
-    if pokemon1["image"]:
-        ecran.blit(pokemon1["image"], (100, 200))
-    if pokemon2["image"]:
-        ecran.blit(pokemon2["image"], (600, 200))
+    if joueur_actuel["image"]:
+        ecran.blit(joueur_actuel["image"], (100, 200))
+    if adversaire["image"]:
+        ecran.blit(adversaire["image"], (600, 200))
     
-    # Affichage des PV
-    pokemon1_pv_text = defaut_font.render(f"{pokemon1['nom']}: {pokemon1['pv']} PV", True, noir)
-    pokemon2_pv_text = defaut_font.render(f"{pokemon2['nom']}: {pokemon2['pv']} PV", True, noir)
-    ecran.blit(pokemon1_pv_text, (50, 50))
-    ecran.blit(pokemon2_pv_text, (550, 50))
+    # Affichage des PV et du niveau
+    joueur_pv_text = defaut_font.render(f"{joueur_actuel['nom']}: {joueur_actuel['pv']} PV", True, noir)
+    adversaire_pv_text = defaut_font.render(f"{adversaire['nom']}: {adversaire['pv']} PV", True, noir)
+    level_text = defaut_font.render(f"Niveau: {level}", True, noir)
+    ecran.blit(joueur_pv_text, (50, 50))
+    ecran.blit(adversaire_pv_text, (550, 50))
+    ecran.blit(level_text, (350, 20))
     
     # Affichage des boutons d'attaque
     boutons = []
@@ -86,15 +134,16 @@ while running:
         elif event.type == pygame.MOUSEBUTTONDOWN:
             for bouton, attaque in boutons:
                 if bouton.collidepoint(event.pos):
-                    degats = random.randint(10, 20)
+                    degats = random.randint(10 + level, 20 + level)
                     adversaire["pv"] -= degats
-                    if adversaire["pv"] < 0:
-                        adversaire["pv"] = 0
                     print(f"{joueur_actuel['nom']} utilise {attaque} et inflige {degats} dégâts!")
-                    joueur_actuel, adversaire = adversaire, joueur_actuel  # Changement de tour
-    
-    if pokemon1["pv"] == 0 or pokemon2["pv"] == 0:
-        print("Combat terminé !")
-        running = False
-    
+                    if adversaire["pv"] <= 0:
+                        level += 1  # Incrémentation du niveau
+                        joueur_actuel["pv"] = joueur_actuel["pv_max"]  # Restauration des PV
+                        adversaire = choisir_pokemon()  # Nouveau combat contre un Pokémon aléatoire
+                    else:
+                        if attaque_adversaire():
+                            running = False
+                    break
+
 pygame.quit()

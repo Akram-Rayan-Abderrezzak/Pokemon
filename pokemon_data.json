@@ -1744,7 +1744,7 @@
         "name": "froakie",
         "height": 3,
         "weight": 70,
-        "PV": 41,
+        "PV": 1000,
         "ATTACK stats": 56,
         "DEFENS": 40,
         "ATTACKSPE": 62,
